@@ -10,21 +10,36 @@ CACHE_FILE = "last_announcement.txt"
 
 def get_latest_announcement():
     try:
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        response = requests.get(GENESYS_URL, headers=headers)
+        # 模擬瀏覽器 Header，避免被封鎖
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8'
+        }
+        
+        # 1. 嘗試抓取頁面
+        response = requests.get(GENESYS_URL, headers=headers, timeout=15)
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # 抓取第一個公告
-        article = soup.find('article')
-        title_element = article.find('h2')
-        title = title_element.get_text(strip=True)
-        link = title_element.find('a')['href']
+        # 2. 修改選擇器 (依據目前 Genesys 結構，公告通常在 .announcement-row 或 h2 a 中)
+        # 我們嘗試尋找包含公告連結的標籤
+        announcement_link = soup.select_one('article h2 a') or soup.select_one('.post-title a')
         
-        # 處理相對路徑
-        if link.startswith('/'):
-            link = GENESYS_BASE_URL + link
+        if announcement_link:
+            title = announcement_link.get_text(strip=True)
+            link = announcement_link['href']
             
-        return title, link
+            # 處理相對路徑
+            if link.startswith('/'):
+                link = GENESYS_BASE_URL + link
+            
+            print(f"成功抓取: {title}")
+            return title, link
+        else:
+            # 除錯用：如果找不到，印出部分 HTML 結構
+            print("找不到公告元素，請檢查網頁結構。")
+            print("HTML 內容摘要:", response.text[:500]) 
+            return None, None
+            
     except Exception as e:
         print(f"抓取出錯: {e}")
         return None, None
